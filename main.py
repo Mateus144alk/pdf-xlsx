@@ -55,22 +55,23 @@ def consolidar_dados(lista_arquivos_pdf, caminho_saida):
             consolidado[matricula][rubrica] = valor
 
     df = pd.DataFrame(consolidado.values())
-    # Renomear colunas para remover " - LEI 11.091/05 AT"
+# Renomear colunas: remover " - LEI 11.091/05 AT" e o código inicial "82919 -"
     df.rename(columns={
-    col: col.replace(" - LEI 11.091/05 AT", "") 
-    for col in df.columns if " - LEI 11.091/05 AT" in col
+    col: re.sub(r"^\d{5} - ", "", col).replace(" - LEI 11.091/05 AT", "")
+    for col in df.columns if re.match(r"^\d{5} - ", col)
     }, inplace=True)
+
+
+    # ✅ Agora salva o arquivo Excel
     df.to_excel(caminho_saida, index=False)
-    print(f"\n✅ Planilha gerada com adicionais em colunas: {caminho_saida}")
-
-
+    print(f"\n✅ Planilha gerada com sucesso em: {caminho_saida}")
 import glob
 
 if __name__ == "__main__":
-    pasta_pdf = r"C:/Ler arquivo/pdf-xlsx/pdfs"
+    pasta_pdf = r"C:/Ler arquivo/pdf-xlsx/pdf-maio"
     
     arquivos_pdf = glob.glob(os.path.join(pasta_pdf, "*.pdf"))
 
-    saida_excel = os.path.join(pasta_pdf, "planilha_salarios_abril.xlsx")
+    saida_excel = os.path.join(pasta_pdf, "planilha_salarios_maio.xlsx")
 
     consolidar_dados(arquivos_pdf, saida_excel)
