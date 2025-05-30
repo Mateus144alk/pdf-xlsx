@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+
 def extrair_dados_pdf(path_pdf):
     dados = []
     tipo_rubrica = ""
@@ -85,26 +86,29 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
     df_final = df_comparado[colunas_ordenadas]
 
     if apenas_diferencas:
-        diff_cols = [col for col in df_final.columns if col.endswith("(Diferença)")]
-        df_final = df_final[df_final[diff_cols].abs().sum(axis=1) > 0]
+     diff_cols = [col for col in df_final.columns if col.endswith("(Diferença)")]
+     df_final[diff_cols] = df_final[diff_cols].round(2)
+     df_final = df_final[df_final[diff_cols].abs().sum(axis=1) > 0]
+
+
 
     df_final.to_excel(caminho_saida, index=False)
     messagebox.showinfo("Sucesso", f"Comparativo gerado com sucesso em:\n{caminho_saida}")
+    # Aplica cor nas colunas de diferença
     wb = load_workbook(caminho_saida)
     ws = wb.active
+    fill = PatternFill(start_color="ee0000", end_color="ee0000", fill_type="solid")  # vermelho claro
 
-    fill_destaque = PatternFill(start_color="FFFACD", end_color="FFFACD", fill_type="solid")  # Amarelo claro
-
-# Localiza colunas de diferença
     for col in range(1, ws.max_column + 1):
-     col_name = ws.cell(row=1, column=col).value
-     if col_name and col_name.endswith("(Diferença)"):
-        for row in range(2, ws.max_row + 1):
-            valor = ws.cell(row=row, column=col).value
-            if isinstance(valor, (int, float)) and abs(valor) > 0.001:
-                ws.cell(row=row, column=col).fill = fill_destaque
+        col_name = ws.cell(row=1, column=col).value
+        if col_name and "(Diferença)" in col_name:
+            for row in range(2, ws.max_row + 1):
+                valor = ws.cell(row=row, column=col).value
+                if isinstance(valor, (int, float)) and abs(valor) > 0.001:
+                    ws.cell(row=row, column=col).fill = fill
 
     wb.save(caminho_saida)
+    messagebox.showinfo("Sucesso", f"Comparativo gerado com sucesso em:\n{caminho_saida}")
 # --- Interface ---
 janela = tk.Tk()
 janela.title("Consolidador e Comparador de Salários")
