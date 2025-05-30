@@ -73,7 +73,9 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
         df_abr[col] = pd.to_numeric(df_abr[col], errors="coerce").fillna(0)
         df_mai[col] = pd.to_numeric(df_mai[col], errors="coerce").fillna(0)
 
-    df_comparado = pd.merge(df_abr, df_mai, on="Matrícula", suffixes=(" (Abr)", " (Mai)"))
+    df_comparado = pd.merge(
+    df_abr, df_mai, on="Matrícula", suffixes=(" (Abr)", " (Mai)"), how="outer", indicator=True
+   )
     df_comparado["Nome"] = df_comparado["Nome (Mai)"].combine_first(df_comparado["Nome (Abr)"])
 
     for col in colunas_valores:
@@ -108,7 +110,6 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
                     ws.cell(row=row, column=col).fill = fill
 
     wb.save(caminho_saida)
-    messagebox.showinfo("Sucesso", f"Comparativo gerado com sucesso em:\n{caminho_saida}")
 # --- Interface ---
 janela = tk.Tk()
 janela.title("Consolidador e Comparador de Salários")
@@ -182,7 +183,7 @@ tk.Button(janela, text="Salvar como Excel", command=salvar_excel_saida).pack()
 tk.Button(janela, text="📥 Gerar Planilha", bg="#4CAF50", fg="white", command=acao_consolidar).pack(pady=10)
 
 # Seção: Comparar
-frame2 = tk.LabelFrame(janela, text="Comparar Planilhas (anteriror vs. atual)")
+frame2 = tk.LabelFrame(janela, text="Comparar Planilhas (anterior vs. atual)")
 frame2.pack(fill="x", padx=10, pady=5)
 
 entrada_abril = tk.Entry(frame2, width=60)
