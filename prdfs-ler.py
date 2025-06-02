@@ -77,7 +77,6 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
     df_abr, df_mai, on="Matrícula", suffixes=(" (Abr)", " (Mai)"), how="outer", indicator=True
    )
     df_comparado["Nome"] = df_comparado["Nome (Mai)"].combine_first(df_comparado["Nome (Abr)"])
-
     for col in colunas_valores:
         df_comparado[f"{col} (Diferença)"] = df_comparado[f"{col} (Mai)"] - df_comparado[f"{col} (Abr)"]
 
@@ -96,7 +95,6 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
 
     df_final.to_excel(caminho_saida, index=False)
     messagebox.showinfo("Sucesso", f"Comparativo gerado com sucesso em:\n{caminho_saida}")
-    # Aplica cor nas colunas de diferença
     wb = load_workbook(caminho_saida)
     ws = wb.active
     fill = PatternFill(start_color="ee0000", end_color="ee0000", fill_type="solid")  # vermelho claro
@@ -110,12 +108,10 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
                     ws.cell(row=row, column=col).fill = fill
 
     wb.save(caminho_saida)
-# --- Interface ---
 janela = tk.Tk()
 janela.title("Consolidador e Comparador de Salários")
 janela.geometry("700x350")
 
-# Consolidação
 def escolher_pasta_pdf():
     pasta = filedialog.askdirectory()
     if pasta:
@@ -140,7 +136,6 @@ def acao_consolidar():
         return
     consolidar_dados(arquivos, saida)
 
-# Comparar
 def selecionar_planilha_abril():
     caminho = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx")])
     if caminho:
