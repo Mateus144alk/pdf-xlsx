@@ -1,55 +1,60 @@
 import pandas as pd
-import shutil
+from openpyxl import load_workbook
 
 # Caminhos
-arquivo_original = "C:/Ler arquivo/pdf-xlsx/3 - Pgto Retroativo PROGRESSÕES.ods"
-arquivo_copia = "C:/Ler arquivo/pdf-xlsx/3 - Pgto Retroativo PROGRESSÕES - Atualizado.xlsx"
-arquivo_datas = "C:/Ler arquivo/pdf-xlsx/datas_extraidas.ods"
+arquivo_prog = "C:/Ler arquivo/pdf-xlsx/3 - Pgto Retroativo PROGRESSÕES - Atualizado.xlsx"
+arquivo_datas = "C:/Ler arquivo/pdf-xlsx/TODOS - PROGRESSÃO MÉRITO.ods"
 
-# Converta o .ods para .xlsx antes (pode usar LibreOffice ou pyexcel-ods3 + openpyxl)
+# 1. Ler e preparar os dados
+try:
+    # Ler arquivo ODS
+    df_datas = pd.read_excel(arquivo_datas, engine="odf")
+    
+    # Verificar colunas (convertendo nomes para maiúsculas para padronizar)
+    df_datas.columns = df_datas.columns.str.upper()
+    
+    # Verificar se as colunas necessárias existem
+    required_columns = {'MAT. SIAPE', 'DIA', 'MÊS'}
+    if not required_columns.issubset(df_datas.columns):
+        missing = required_columns - set(df_datas.columns)
+        raise ValueError(f"Colunas faltando: {missing}")
 
-# Criar cópia da planilha original
-shutil.copyfile(arquivo_original.replace(".ods", ".xlsx"), arquivo_copia)
+    # Processar dados
+    df_datas['MAT. SIAPE'] = df_datas['MAT. SIAPE'].astype(str).str.strip()
+    df_datas['DIA'] = df_datas['DIA'].astype(str).str.strip()
+    df_datas['MÊS'] = df_datas['MÊS'].astype(str).str.strip()
 
-# === 1. Ler planilha de datas ===
-import ezodf
-ezodf.config.set_table_expand_strategy('all')
-ods_datas = ezodf.opendoc(arquivo_datas)
-sheet_datas = ods_datas.sheets[0]
+    # 2. Tratar valores duplicados (manter a primeira ocorrência)
+    df_datas = df_datas.drop_duplicates(subset=['MAT. SIAPE'], keep='first')
+    
+    # 3. Carregar arquivo Excel de progressões
+    wb = load_workbook(arquivo_prog)
+    ws = wb.active
+    
+    # 4. Criar dicionário de mapeamento
+    mapa_datas = df_datas.set_index('MAT. SIAPE')[['DIA', 'MÊS']].to_dict('index')
+    
+    # 5. Preencher dados na planilha de progressões
+    for row in range(3, ws.max_row + 1):
+        siape_cell = ws.cell(row=row, column=2).value  # Coluna B (2)
+        if siape_cell:
+            siape = str(siape_cell).strip()
+            if siape in mapa_datas:
+                dia = mapa_datas[siape]['DIA']
+                mes = mapa_datas[siape]['MÊS']
+                ws.cell(row=row, column=34, value=dia)  # Coluna AH
+                ws.cell(row=row, column=35, value=mes)  # Coluna AI
+    
+    # 6. Salvar com backup
+    backup_path = arquivo_prog.replace('.xlsx', '_BACKUP.xlsx')
+    wb.save(backup_path)
+    print(f"Backup criado em: {backup_path}")
+    
+    wb.save(arquivo_prog)
+    print(f"Arquivo atualizado: {arquivo_prog}")
+    print(f"Total de registros processados: {len(mapa_datas)}")
 
-dia = int(sheet_datas['C2'].value)
-mes = int(sheet_datas['D2'].value)
-print(f"Dia: {dia} | Mês: {mes}")
-
-siapes_datas = []
-for row in range(1, sheet_datas.nrows()):
-    siape = sheet_datas[row, 0].value
-    if siape:
-        siapes_datas.append(str(siape).strip())
-
-print("SIAPEs extraídos:", siapes_datas)
-
-# === 2. Ler a planilha de progressões com header correto ===
-df_prog = pd.read_excel(arquivo_copia, engine="openpyxl", header=1)
-df_prog.columns = df_prog.columns.str.strip().str.upper()
-
-# Verificar se coluna "SIAPE" existe
-if 'SIAPE' not in df_prog.columns:
-    print("Coluna 'SIAPE' não encontrada.")
-    exit()
-
-# Preparar os valores para preenchimento
-df_prog['SIAPE'] = df_prog['SIAPE'].astype(str).str.strip()
-
-# === 3. Preencher colunas AH e AI com dia e mês ===
-col_ah = 33  # AH (34ª coluna, zero-indexed)
-col_ai = 34  # AI (35ª coluna)
-
-for idx, row in df_prog.iterrows():
-    if row['SIAPE'] in siapes_datas:
-        df_prog.iat[idx, col_ah] = dia
-        df_prog.iat[idx, col_ai] = mes
-
-# === 4. Salvar resultado ===
-df_prog.to_excel(arquivo_copia, index=False)
-print(f"Arquivo atualizado salvo em: {arquivo_copia}")
+except Exception as e:
+    print(f"\nErro durante a execução: {str(e)}")
+    print("\nColunas disponíveis no arquivo ODS:")
+    print(df_datas.columns.tolist() if 'df_datas' in locals() else "Arquivo não pôde ser lido")
