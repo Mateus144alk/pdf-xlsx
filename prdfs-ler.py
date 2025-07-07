@@ -271,8 +271,12 @@ def gerar_carga_batch():
             return
 
         registros_batch = []
+        colunas_padrao = ["Nome", "Matrícula", "Sequência"]
+        colunas_valor = [
+         col for col in df_consolidado.columns
+         if col not in colunas_padrao and not df_consolidado[col].fillna(0).eq(0).all()
+]
 
-        colunas_valor = [col for col in df_consolidado.columns if col not in ["Nome", "Matrícula", "Sequência"]]
         if len(colunas_valor) != 1:
          messagebox.showerror("Erro", f"A planilha consolidada deve conter apenas UMA coluna de valor (além de Nome/Matrícula). Encontrado: {colunas_valor}")
          return
