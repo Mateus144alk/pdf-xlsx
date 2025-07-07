@@ -33,7 +33,7 @@ def extrair_dados_pdf(path_pdf):
                     dados.append((nome, matricula, tipo_rubrica, valor))
     return dados
 
-def consolidar_dados(lista_arquivos_pdf, caminho_saida):
+def consolidar_dados(lista_arquivos_pdf, caminho_saida, mes_folha):
     registros = []
     for arquivo in lista_arquivos_pdf:
         registros.extend(extrair_dados_pdf(arquivo))
@@ -47,6 +47,7 @@ def consolidar_dados(lista_arquivos_pdf, caminho_saida):
                 "Nome": nome,
                 "Matrícula": matricula,
                 "Salário Básico": 0,
+                "Sequência": mes_folha,  # Adiciona o mês digitado
                 **{tipo: 0 for tipo in tipos_adicionais}
             }
         if "BASICO" in rubrica.upper():
@@ -59,8 +60,10 @@ def consolidar_dados(lista_arquivos_pdf, caminho_saida):
         col: re.sub(r"^\d{5} - ", "", col).replace(" - LEI 11.091/05 AT", "")
         for col in df.columns if re.match(r"^\d{5} - ", col)
     }, inplace=True)
+
     df.to_excel(caminho_saida, index=False)
     messagebox.showinfo("Sucesso", f"Planilha criada com sucesso em:\n{caminho_saida}")
+
 
 def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_diferencas=False):
     df_abr = pd.read_excel(caminho_abril)
@@ -110,7 +113,7 @@ def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_difere
     wb.save(caminho_saida)
 janela = tk.Tk()
 janela.title("Consolidador e Comparador de Salários")
-janela.geometry("700x350")
+janela.geometry("750x350")
 
 def escolher_pasta_pdf():
     pasta = filedialog.askdirectory()
@@ -127,14 +130,23 @@ def salvar_excel_saida():
 def acao_consolidar():
     pasta = entrada_pasta.get().strip()
     saida = entrada_saida.get().strip()
-    if not pasta or not saida:
-        messagebox.showwarning("Atenção", "Preencha todos os campos.")
+    mes_folha = entrada_mes.get().strip()
+
+    if not pasta or not saida or not mes_folha:
+        messagebox.showwarning("Atenção", "Preencha todos os campos, incluindo o mês.")
         return
+
+    if not mes_folha.isdigit():
+        messagebox.showerror("Erro", "O mês da folha deve ser um número.")
+        return
+
     arquivos = glob.glob(os.path.join(pasta, "*.pdf"))
     if not arquivos:
         messagebox.showwarning("Aviso", "Nenhum PDF encontrado na pasta.")
         return
-    consolidar_dados(arquivos, saida)
+
+    consolidar_dados(arquivos, saida, int(mes_folha))
+
 
 def selecionar_planilha_abril():
     caminho = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx")])
@@ -174,6 +186,13 @@ tk.Button(frame1, text="Selecionar Pasta", command=escolher_pasta_pdf).pack(side
 
 entrada_saida = tk.Entry(janela, width=70)
 entrada_saida.pack(padx=15)
+frame_mes = tk.Frame(janela)
+frame_mes.pack(padx=10, pady=5)
+
+tk.Label(frame_mes, text="Mês da folha (número):").pack(side="left")
+entrada_mes = tk.Entry(frame_mes, width=10)
+entrada_mes.pack(side="left", padx=5)
+
 tk.Button(janela, text="Salvar como Excel", command=salvar_excel_saida).pack()
 tk.Button(janela, text="📥 Gerar Planilha", bg="#4CAF50", fg="white", command=acao_consolidar).pack(pady=10)
 
