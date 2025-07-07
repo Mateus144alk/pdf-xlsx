@@ -122,32 +122,60 @@ def escolher_pasta_pdf():
         entrada_pasta.insert(0, pasta)
 
 def salvar_excel_saida():
-    caminho = filedialog.asksaveasfilename(defaultextension=".xlsx")
-    if caminho:
-        entrada_saida.delete(0, tk.END)
-        entrada_saida.insert(0, caminho)
+    if check_destino_pasta.get():
+        # Selecionar apenas a pasta
+        pasta = filedialog.askdirectory()
+        if pasta:
+            # Tenta pegar o número do mês digitado
+            mes = entrada_mes.get().strip()
+            if not mes.isdigit():
+                mes = "XX"
+            nome_arquivo = f"consolidado_mes_{mes}.xlsx"
+            caminho = os.path.join(pasta, nome_arquivo)
 
+            entrada_saida.delete(0, tk.END)
+            entrada_saida.insert(0, caminho)
+    else:
+        # Permite salvar como arquivo manualmente
+        caminho = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
+        if caminho:
+            entrada_saida.delete(0, tk.END)
+            entrada_saida.insert(0, caminho)
+
+
+    
 def acao_consolidar():
-    pasta = entrada_pasta.get().strip()
+    caminho = entrada_pasta.get().strip()
     saida = entrada_saida.get().strip()
-    mes_folha = entrada_mes.get().strip()
+    mes = entrada_mes.get().strip()
 
-    if not pasta or not saida or not mes_folha:
+    if not caminho or not saida or not mes:
         messagebox.showwarning("Atenção", "Preencha todos os campos, incluindo o mês.")
         return
 
-    if not mes_folha.isdigit():
-        messagebox.showerror("Erro", "O mês da folha deve ser um número.")
+    if not mes.isdigit():
+        messagebox.showerror("Erro", "O mês deve ser um número inteiro.")
         return
 
-    arquivos = glob.glob(os.path.join(pasta, "*.pdf"))
-    if not arquivos:
-        messagebox.showwarning("Aviso", "Nenhum PDF encontrado na pasta.")
-        return
+    mes_folha = int(mes)
 
-    consolidar_dados(arquivos, saida, int(mes_folha))
+    if check_arquivo_unico.get():
+        if not os.path.isfile(caminho) or not caminho.lower().endswith(".pdf"):
+            messagebox.showerror("Erro", "Selecione um arquivo PDF válido.")
+            return
+        arquivos = [caminho]
+    else:
+        if not os.path.isdir(caminho):
+            messagebox.showerror("Erro", "Selecione uma pasta válida.")
+            return
+        arquivos = glob.glob(os.path.join(caminho, "*.pdf"))
+        if not arquivos:
+            messagebox.showwarning("Aviso", "Nenhum PDF encontrado na pasta.")
+            return
 
-dados_siape = pd.DataFrame()
+    consolidar_dados(arquivos, saida, mes_folha)
+
+
 
 def selecionar_planilha_siape():
     global dados_siape
@@ -176,6 +204,36 @@ def selecionar_planilha_maio():
     if caminho:
         entrada_maio.delete(0, tk.END)
         entrada_maio.insert(0, caminho)
+def selecionar_consolidado_unico():
+    if check_destino_pasta.get():
+        # Modo salvar em uma pasta (gera o nome automaticamente)
+        pasta = filedialog.askdirectory()
+        if pasta:
+            mes = entrada_mes.get().strip()
+            if not mes.isdigit():
+                mes = "XX"
+            nome_arquivo = f"consolidado_mes_{mes}.xlsx"
+            caminho = os.path.join(pasta, nome_arquivo)
+            entrada_saida.delete(0, tk.END)
+            entrada_saida.insert(0, caminho)
+    else:
+        # Modo selecionar um arquivo .xlsx normalmente
+        caminho = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+        if caminho:
+            entrada_saida.delete(0, tk.END)
+            entrada_saida.insert(0, caminho)
+
+def escolher_pdf_ou_pasta():
+    if check_arquivo_unico.get():
+        caminho = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
+        if caminho:
+            entrada_pasta.delete(0, tk.END)
+            entrada_pasta.insert(0, caminho)
+    else:
+        pasta = filedialog.askdirectory()
+        if pasta:
+            entrada_pasta.delete(0, tk.END)
+            entrada_pasta.insert(0, pasta)
 
 def salvar_comparativo():
     caminho = filedialog.asksaveasfilename(defaultextension=".xlsx")
@@ -214,8 +272,15 @@ def gerar_carga_batch():
 
         registros_batch = []
 
+        colunas_valor = [col for col in df_consolidado.columns if col not in ["Nome", "Matrícula", "Sequência"]]
+        if len(colunas_valor) != 1:
+         messagebox.showerror("Erro", f"A planilha consolidada deve conter apenas UMA coluna de valor (além de Nome/Matrícula). Encontrado: {colunas_valor}")
+         return
+
+        coluna_valor = colunas_valor[0]
+
         for _, row in df_merge.iterrows():
-            valor = row.get("Salário Básico", 0)
+            valor = row.get(coluna_valor, 0)
             if pd.isna(valor) or valor == 0:
                 continue
 
@@ -257,12 +322,19 @@ def acao_comparar():
 frame1 = tk.LabelFrame(janela, text="Agrupar dados pdf em planilha")
 frame1.pack(fill="x", padx=10, pady=5)
 
-entrada_pasta = tk.Entry(frame1, width=70)
+entrada_pasta = tk.Entry(frame1, width=60)
 entrada_pasta.pack(side="left", padx=5, pady=5)
-tk.Button(frame1, text="Selecionar Pasta", command=escolher_pasta_pdf).pack(side="left")
 
-entrada_saida = tk.Entry(janela, width=70)
+check_arquivo_unico = tk.BooleanVar()
+tk.Checkbutton(frame1, text="Selecionar apenas um PDF", variable=check_arquivo_unico).pack(side="left", padx=5)
+
+tk.Button(frame1, text="Selecionar", command=lambda: escolher_pdf_ou_pasta()).pack(side="left", padx=5)
+
+
+entrada_saida = tk.Entry(janela, width=60)
 entrada_saida.pack(padx=15)
+check_destino_pasta = tk.BooleanVar()
+tk.Checkbutton(janela, text="Salvar em uma pasta (gerar nome automático)", variable=check_destino_pasta).pack()
 frame_mes = tk.Frame(janela)
 frame_mes.pack(padx=10, pady=5)
 
@@ -270,7 +342,7 @@ tk.Label(frame_mes, text="Mês da folha (número):").pack(side="left")
 entrada_mes = tk.Entry(frame_mes, width=10)
 entrada_mes.pack(side="left", padx=5)
 
-tk.Button(janela, text="Salvar como Excel", command=salvar_excel_saida).pack()
+tk.Button(janela, text="Selecionar Pasta Arquivo Consolidado (Excel)", command=lambda: selecionar_consolidado_unico()).pack()
 tk.Button(janela, text="📥 Gerar Planilha", bg="#4CAF50", fg="white", command=acao_consolidar).pack(pady=10)
 
 frame3 = tk.LabelFrame(janela, text="Importar dados extraídos do SIAPE")
