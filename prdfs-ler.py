@@ -147,6 +147,23 @@ def acao_consolidar():
 
     consolidar_dados(arquivos, saida, int(mes_folha))
 
+dados_siape = pd.DataFrame()
+
+def selecionar_planilha_siape():
+    global dados_siape
+    caminho = filedialog.askopenfilename(filetypes=[("Planilhas Excel", "*.xlsx *.xls")])
+    if caminho:
+        entrada_siape.delete(0, tk.END)
+        entrada_siape.insert(0, caminho)
+        try:
+            dados_siape = pd.read_excel(caminho, usecols="A:H")
+            dados_siape.columns = [
+                "SIAPE", "MATRÍCULA ORIGEM", "NOME SERVIDOR",
+                "SITUAÇÃO", "CARGO", "CLASSE", "PADRÃO", "DV SIAPE"
+            ]
+            messagebox.showinfo("Sucesso", "Planilha SIAPE carregada com sucesso!")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao ler a planilha SIAPE:\n{e}")
 
 def selecionar_planilha_abril():
     caminho = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx")])
@@ -165,6 +182,66 @@ def salvar_comparativo():
     if caminho:
         entrada_comparativo.delete(0, tk.END)
         entrada_comparativo.insert(0, caminho)
+def gerar_carga_batch():
+    global dados_siape
+    caminho_consolidado = entrada_saida.get()
+    rubrica = entrada_rubrica.get().strip()
+    sequencia = entrada_seq_batch.get().strip()
+
+    if not caminho_consolidado or dados_siape.empty or not rubrica or not sequencia:
+        messagebox.showwarning("Atenção", "Preencha rubrica, sequência e carregue a planilha SIAPE e consolidada.")
+        return
+
+    if not rubrica.isdigit() or not sequencia.isdigit():
+        messagebox.showerror("Erro", "Rubrica e Sequência devem conter apenas números.")
+        return
+
+    try:
+        df_consolidado = pd.read_excel(caminho_consolidado)
+        df_siape = dados_siape.copy()
+
+        df_merge = pd.merge(
+            df_consolidado,
+            df_siape,
+            left_on="Matrícula",
+            right_on="SIAPE",
+            how="inner"
+        )
+
+        if df_merge.empty:
+            messagebox.showerror("Erro", "Nenhuma correspondência encontrada entre consolidação e SIAPE.")
+            return
+
+        registros_batch = []
+
+        for _, row in df_merge.iterrows():
+            valor = row.get("Salário Básico", 0)
+            if pd.isna(valor) or valor == 0:
+                continue
+
+            registros_batch.append({
+                "MatSiape": row["SIAPE"],
+                "DVSiape": row["DV SIAPE"],
+                "Comando": 4,
+                "RendimentoDesconto": 1,
+                "Rubrica": rubrica.zfill(5),
+                "Sequencia": int(sequencia),
+                "Valor": round(valor, 2),
+                "MatriculaOrigem": row["MATRÍCULA ORIGEM"]
+            })
+
+        if not registros_batch:
+            messagebox.showinfo("Aviso", "Nenhum valor válido para gerar a carga.")
+            return
+
+        df_batch = pd.DataFrame(registros_batch)
+        caminho_csv = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+        if caminho_csv:
+            df_batch.to_csv(caminho_csv, index=False, sep=";", decimal=",")
+            messagebox.showinfo("Sucesso", f"Carga CSV gerada com sucesso em:\n{caminho_csv}")
+
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao gerar carga:\n{e}")
 
 def acao_comparar():
     abr = entrada_abril.get()
@@ -195,6 +272,25 @@ entrada_mes.pack(side="left", padx=5)
 
 tk.Button(janela, text="Salvar como Excel", command=salvar_excel_saida).pack()
 tk.Button(janela, text="📥 Gerar Planilha", bg="#4CAF50", fg="white", command=acao_consolidar).pack(pady=10)
+
+frame3 = tk.LabelFrame(janela, text="Importar dados extraídos do SIAPE")
+frame3.pack(fill="x", padx=10, pady=5)
+
+entrada_siape = tk.Entry(frame3, width=60)
+entrada_siape.pack(side="left", padx=5)
+tk.Button(frame3, text="Selecionar Planilha SIAPE", command=lambda: selecionar_planilha_siape()).pack(side="left")
+frame4 = tk.LabelFrame(janela, text="Gerar Carga Batch")
+frame4.pack(fill="x", padx=10, pady=5)
+
+tk.Label(frame4, text="Rubrica:").pack(side="left", padx=5)
+entrada_rubrica = tk.Entry(frame4, width=10)
+entrada_rubrica.pack(side="left")
+
+tk.Label(frame4, text="Sequência:").pack(side="left", padx=5)
+entrada_seq_batch = tk.Entry(frame4, width=5)
+entrada_seq_batch.pack(side="left", padx=5)
+
+tk.Button(frame4, text="💾 Gerar Carga CSV", bg="#FF9800", fg="white", command=lambda: gerar_carga_batch()).pack(side="left", padx=10)
 
 # Seção: Comparar
 frame2 = tk.LabelFrame(janela, text="Comparar Planilhas (anterior vs. atual)")
