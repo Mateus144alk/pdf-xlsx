@@ -47,7 +47,7 @@ def consolidar_dados(lista_arquivos_pdf, caminho_saida, mes_folha):
                 "Nome": nome,
                 "Matrícula": matricula,
                 "Salário Básico": 0,
-                "Sequência": mes_folha,  # Adiciona o mês digitado
+                "Sequência": mes_folha,  
                 **{tipo: 0 for tipo in tipos_adicionais}
             }
         if "BASICO" in rubrica.upper():
@@ -65,9 +65,9 @@ def consolidar_dados(lista_arquivos_pdf, caminho_saida, mes_folha):
     messagebox.showinfo("Sucesso", f"Planilha criada com sucesso em:\n{caminho_saida}")
 
 
-def comparar_planilhas(caminho_abril, caminho_maio, caminho_saida, apenas_diferencas=False):
-    df_abr = pd.read_excel(caminho_abril)
-    df_mai = pd.read_excel(caminho_maio)
+def comparar_planilhas(caminho_anterior, caminho_atual, caminho_saida, apenas_diferencas=False):
+    df_abr = pd.read_excel(caminho_anterior)
+    df_mai = pd.read_excel(caminho_atual)
 
     colunas_excluir = ["Nome", "Matrícula"]
     colunas_valores = [col for col in df_abr.columns if col not in colunas_excluir]
@@ -193,17 +193,17 @@ def selecionar_planilha_siape():
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao ler a planilha SIAPE:\n{e}")
 
-def selecionar_planilha_abril():
+def selecionar_planilha_anterior():
     caminho = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx")])
     if caminho:
-        entrada_abril.delete(0, tk.END)
-        entrada_abril.insert(0, caminho)
+        entrada_anterior.delete(0, tk.END)
+        entrada_anterior.insert(0, caminho)
 
-def selecionar_planilha_maio():
+def selecionar_planilha_atual():
     caminho = filedialog.askopenfilename(filetypes=[("Excel", "*.xlsx")])
     if caminho:
-        entrada_maio.delete(0, tk.END)
-        entrada_maio.insert(0, caminho)
+        entrada_atual.delete(0, tk.END)
+        entrada_atual.insert(0, caminho)
 def selecionar_consolidado_unico():
     if check_destino_pasta.get():
         # Modo salvar em uma pasta (gera o nome automaticamente)
@@ -313,8 +313,8 @@ def gerar_carga_batch():
         messagebox.showerror("Erro", f"Erro ao gerar carga:\n{e}")
 
 def acao_comparar():
-    abr = entrada_abril.get()
-    mai = entrada_maio.get()
+    abr = entrada_anterior.get()
+    mai = entrada_atual.get()
     saida = entrada_comparativo.get()
     somente_diff = var_diferencas.get()
     if not abr or not mai or not saida:
@@ -372,13 +372,13 @@ tk.Button(frame4, text="💾 Gerar Carga CSV", bg="#FF9800", fg="white", command
 frame2 = tk.LabelFrame(janela, text="Comparar Planilhas (anterior vs. atual)")
 frame2.pack(fill="x", padx=10, pady=5)
 
-entrada_abril = tk.Entry(frame2, width=60)
-entrada_abril.pack(side="left", padx=5)
-tk.Button(frame2, text="Planilha Anterior", command=selecionar_planilha_abril).pack(side="left")
+entrada_anterior = tk.Entry(frame2, width=60)
+entrada_anterior.pack(side="left", padx=5)
+tk.Button(frame2, text="Planilha Anterior", command=selecionar_planilha_anterior).pack(side="left")
 
-entrada_maio = tk.Entry(janela, width=60)
-entrada_maio.pack(padx=15)
-tk.Button(janela, text="Planilha Atual", command=selecionar_planilha_maio).pack()
+entrada_atual = tk.Entry(janela, width=60)
+entrada_atual.pack(padx=15)
+tk.Button(janela, text="Planilha Atual", command=selecionar_planilha_atual).pack()
 
 entrada_comparativo = tk.Entry(janela, width=60)
 entrada_comparativo.pack(padx=15)
