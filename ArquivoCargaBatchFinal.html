@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>MoviFinanc Web</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 300px; }
+    input, button { margin: 10px 0; display: block; }
+  </style>
+</head>
+<body>
+  <h2>Gerador Movi-Financ</h2>
+
+  <label>Órgão SIAPE:</label>
+  <input type="text" id="matrizPadrao" value="00000">
+
+  <label>Mês Pagamento:</label>
+  <input type="text" id="mesPagto" value="02">
+
+  <label>Ano Pagamento:</label>
+  <input type="text" id="anoPagto" value="2025">
+
+  <label>Mês Rubrica (Refere-se aos lançamentos):</label>
+  <input type="text" id="mesRubr" value="01">
+
+  <label>Ano Rubrica (Refere-se aos lançamentos):</label>
+  <input type="text" id="anoRubr" value="2025">
+
+  <label>Nome da Instituição (máx. 6 caracteres):</label>
+  <input type="text" id="nomeInstituicao" value="MFINST">
+
+  <label>Rubrica do Arquivo (Header):</label>
+  <input type="text" id="rubricaDoArquivo" value="00001">
+
+  <label>Arquivo CSV:</label>
+  <input type="file" id="csvInput" accept=".csv">
+
+  <button onclick="processCSV()">Gerar Registros</button>
+  <button onclick="downloadTxt()">Baixar Arquivo TXT</button>
+  <button onclick="baixarModeloCSV()">Baixar Modelo CSV</button>
+
+  <textarea id="output" readonly></textarea>
+
+  <script>
+    let registros = [];
+
+    function preencherZeros(valor, tamanho) {
+      valor = valor.toString();
+      while (valor.length < tamanho) valor = '0' + valor;
+      return valor;
+    }
+
+    function formatarValor(valorStr) {
+      let valor = parseFloat(valorStr.replace(',', '.')) || 0;
+      let parteInteira = preencherZeros(Math.trunc(valor), 9);
+      let parteDecimal = preencherZeros(Math.round((valor % 1) * 100), 2);
+      return parteInteira + parteDecimal;
+    }
+
+    function validarCampos(matrizPadrao, mesPagto, anoPagto, mesRubr, anoRubr) {
+      const somenteNumeros = /^\d+$/;
+      const nomeInstituicao = document.getElementById('nomeInstituicao').value;
+      const letrasEspacos = /^[A-Za-z\s]+$/;
+
+      if (!(nomeInstituicao.trim().length >= 1 && letrasEspacos.test(nomeInstituicao))) {
+        alert('O nome da instituição deve conter apenas letras e ao menos 1 caractere.');
+        return false;
+      }
+      if (!(somenteNumeros.test(matrizPadrao) && matrizPadrao.length === 5)) {
+        alert('Órgão SIAPE deve conter exatamente 5 números.');
+        return false;
+      }
+      if (!(somenteNumeros.test(mesPagto) && mesPagto.length === 2)) {
+        alert('Mês Pagamento deve conter exatamente 2 números.');
+        return false;
+      }
+      if (!(somenteNumeros.test(anoPagto) && anoPagto.length === 4)) {
+        alert('Ano Pagamento deve conter exatamente 4 números.');
+        return false;
+      }
+      if (!(somenteNumeros.test(mesRubr) && mesRubr.length === 2)) {
+        alert('Mês Rubrica deve conter exatamente 2 números.');
+        return false;
+      }
+      if (!(somenteNumeros.test(anoRubr) && anoRubr.length === 4)) {
+        alert('Ano Rubrica deve conter exatamente 4 números.');
+        return false;
+      }
+      return true;
+    }
+
+    function processCSV() {
+      const fileInput = document.getElementById('csvInput');
+      const output = document.getElementById('output');
+      registros = [];
+
+      const matrizPadrao = document.getElementById('matrizPadrao').value;
+      const mesPagto = document.getElementById('mesPagto').value;
+      const anoPagto = document.getElementById('anoPagto').value;
+      const mesRubr = document.getElementById('mesRubr').value;
+      const anoRubr = document.getElementById('anoRubr').value;
+      const nomeInstituicao = document.getElementById('nomeInstituicao').value.padEnd(6, ' ').slice(0, 6);
+      const rubricaInput = document.getElementById('rubricaDoArquivo').value;
+      const RubricaDoArquivo = preencherZeros(rubricaInput, 5);
+
+      if (!validarCampos(matrizPadrao, mesPagto, anoPagto, mesRubr, anoRubr)) return;
+      if (!fileInput.files.length) return alert('Selecione um arquivo CSV.');
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const linhas = e.target.result.trim().split(/\r?\n/);
+        if (linhas.length < 2) return;
+
+        registros.push(
+          '0' + matrizPadrao + '0000000000000000' + mesPagto + anoPagto +
+          nomeInstituicao + ' '.repeat(29) + 'MOVI-FINANC' + ' ' + RubricaDoArquivo + ' '.repeat(120)
+        );
+
+        for (let i = 1; i < linhas.length; i++) {
+          const partes = linhas[i].split(';');
+          if (partes.length < 8) continue;
+
+          const matSiape = preencherZeros(partes[0], 7);
+          const dvSiape = partes[1];
+          const comando = partes[2];
+          const rendimentoDesconto = (partes[3] === '2') ? '2' : '1';
+          const rubrica = preencherZeros(partes[4], 5);
+          const sequencia = partes[5];
+          const valor = formatarValor(partes[6]);
+          const matriculaOrigem = preencherZeros(partes[7], 8);
+
+          if (!/^[0-9]$/.test(sequencia)) {
+            alert(`Linha ${i + 1}: Sequência inválida. Deve conter exatamente 1 dígito numérico.`);
+            return;
+          }
+
+          if (!/^[3-5]$/.test(comando)) {
+            alert(`Linha ${i + 1}: Comando inválido. Deve ser 3, 4 ou 5.`);
+            return;
+          }
+
+          const registro =
+            '1' + matrizPadrao + matSiape + dvSiape + comando + rendimentoDesconto + rubrica + sequencia + valor +
+            '001' + matriculaOrigem + ' '.repeat(38) + '00000' + '00000' + '00000' +
+            ' '.repeat(4) + '44' + '000' + '000' + '00000' + ' ' + ' '.repeat(9) +
+            ' '.repeat(6) + '00000' + '00000' + '0000' + '00000' + mesRubr + anoRubr +
+            ' '.repeat(5) + '00000000000000' + '000' + '000000' + '0000000000000' + ' '.repeat(4);
+
+          registros.push(registro);
+        }
+
+        const numRegs = preencherZeros(registros.length - 1, 7);
+        registros.push('9' + matrizPadrao + '9'.repeat(16) + numRegs + ' '.repeat(171));
+
+        output.value = registros.join('\n');
+      };
+      reader.readAsText(fileInput.files[0]);
+    }
+
+    function downloadTxt() {
+      const txt = registros.join('\r\n');
+      const uint8array = new Uint8Array(txt.length);
+      for (let i = 0; i < txt.length; i++) {
+        uint8array[i] = txt.charCodeAt(i) & 0xFF; // simulate ANSI
+      }
+      const blob = new Blob([uint8array], { type: 'text/plain;charset=windows-1252' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'tbmovifinanc.txt';
+      a.click();
+    }
+
+    function baixarModeloCSV() {
+      const linhas = [
+        ['MatSiape', 'DVSiape', 'Comando', 'RendimentoDesconto', 'Rubrica', 'Sequencia', 'Valor', 'MatriculaOrigem'],
+        ['1234567', '0', '4', '1', '00001', '6', '3029,90', '22222222'],
+        ['7654321', '1', '3', '1', '00001', '6', '2150,75', '33333333'],
+        ['1111222', '0', '5', '1', '00001', '6', '1488,65', '44444444']
+      ];
+      const conteudo = linhas.map(l => l.join(';')).join('\r\n');
+      const blob = new Blob([conteudo], { type: 'text/csv;charset=windows-1252' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'modelo_movi_financ.csv';
+      a.click();
+    }
+  </script>
+</body>
+</html>
