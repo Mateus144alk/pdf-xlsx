@@ -64,6 +64,60 @@ def consolidar_dados(lista_arquivos_pdf, caminho_saida, mes_folha):
 
     df.to_excel(caminho_saida, index=False)
     messagebox.showinfo("Sucesso", f"Planilha criada com sucesso em:\n{caminho_saida}")
+dados_retroativo = pd.DataFrame()
+
+def selecionar_planilha_retroativa():
+    global dados_retroativo
+    caminho = filedialog.askopenfilename(filetypes=[("Planilhas Excel", "*.xlsx *.xls")])
+    if caminho:
+        entrada_planilha_retroativo.delete(0, tk.END)
+        entrada_planilha_retroativo.insert(0, caminho)
+        try:
+            dados_retroativo = pd.read_excel(caminho)
+            messagebox.showinfo("Sucesso", "Planilha de retroativos carregada com sucesso!")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao carregar planilha:\n{e}")
+    
+def gerar_valores_retroativos():
+    try:
+        if dados_retroativo.empty:
+            messagebox.showwarning("Aviso", "Nenhuma planilha de retroativo carregada.")
+            return
+
+        caminho_anterior = entrada_anterior.get()
+        caminho_atual = entrada_atual.get()
+
+        if not caminho_anterior or not caminho_atual:
+            messagebox.showwarning("Aviso", "Selecione planilhas de meses para comparação (anterior e atual).")
+            return
+
+        df_ant = pd.read_excel(caminho_anterior)
+        df_atu = pd.read_excel(caminho_atual)
+
+        col_ref = [col for col in df_ant.columns if col not in ("Nome", "Matrícula")]
+        if len(col_ref) != 1:
+            messagebox.showerror("Erro", f"Apenas uma coluna de valor esperada. Encontrado: {col_ref}")
+            return
+
+        coluna_valor = col_ref[0]
+
+        df_ant = df_ant[["Matrícula", coluna_valor]].rename(columns={coluna_valor: "Valor Antigo"})
+        df_atu = df_atu[["Matrícula", coluna_valor]].rename(columns={coluna_valor: "Valor Atual"})
+
+        df_diff = pd.merge(df_atu, df_ant, on="Matrícula")
+        df_diff["x3"] = df_diff["Valor Atual"] - df_diff["Valor Antigo"]
+
+        df_retro = pd.merge(dados_retroativo, df_diff, left_on="SIAPE", right_on="Matrícula", how="inner")
+        df_retro["Valor Retroativo"] = (df_retro["x3"] * df_retro["MESES RETROATIVOS"]) + \
+                                       ((df_retro["x3"] / 30) * df_retro["DIAS RETROATIVOS"])
+
+        salvar_em = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")])
+        if salvar_em:
+            df_retro[["SIAPE", "NOME", "MESES RETROATIVOS", "DIAS RETROATIVOS", "Valor Retroativo"]].to_excel(salvar_em, index=False)
+            messagebox.showinfo("Sucesso", f"Retroativo gerado com sucesso em:\n{salvar_em}")
+
+    except Exception as e:
+        messagebox.showerror("Erro", f"Ocorreu um erro ao gerar valores retroativos:\n{e}")
 
 
 def comparar_planilhas(caminho_anterior, caminho_atual, caminho_saida, apenas_diferencas=False):
@@ -357,6 +411,13 @@ check_arquivo_unico = tk.BooleanVar()
 tk.Checkbutton(frame1, text="Selecionar apenas um PDF", variable=check_arquivo_unico).pack(side="left", padx=5)
 
 tk.Button(frame1, text="Selecionar", command=lambda: escolher_pdf_ou_pasta()).pack(side="left", padx=5)
+frame_retroativo = tk.LabelFrame(janela, text="Planilha de Dados Retroativos")
+frame_retroativo.pack(fill="x", padx=10, pady=5)
+
+entrada_planilha_retroativo = tk.Entry(frame_retroativo, width=60)
+entrada_planilha_retroativo.pack(side="left", padx=5)
+
+tk.Button(frame_retroativo, text="Selecionar Planilha Retroativo", command=lambda: selecionar_planilha_retroativa()).pack(side="left")
 
 
 entrada_saida = tk.Entry(janela, width=60)
