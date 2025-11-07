@@ -5,6 +5,8 @@ import os
 import calendar
 import csv
 from datetime import date
+import pdfplumber
+import re
 # Dados globais
 dados_retroativo = pd.DataFrame()
 dados_siape = pd.DataFrame()
@@ -27,8 +29,6 @@ def mostrar_log_comparacao():
 
 
 def extrair_dados_pdf(path_pdf):
-    import pdfplumber
-    import re
     dados = []
 
     with pdfplumber.open(path_pdf) as pdf:
@@ -131,8 +131,6 @@ def calcular_retroativos():
 
 
 #--------------------programação da logica etapa  3 DADOS EXTRATOR SIAPE:-----------------------------
-import pandas as pd
-
 def ler_dados_siape(caminho_planilha):
 
     try:
