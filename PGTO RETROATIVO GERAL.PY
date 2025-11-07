@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox
 import pandas as pd
 import os
 import csv
+from datetime import date
 # Dados globais
 dados_retroativo = pd.DataFrame()
 dados_siape = pd.DataFrame()
@@ -44,30 +45,57 @@ def extrair_dados_pdf(path_pdf):
     return dados
 #-------------------------------programação e logica etapa 2  DATA RETROATIVA DO PAGAMENTO---------------------===
 def ler_planilha_retroativa(caminho):
+    import pandas as pd
     df = pd.read_excel(caminho)
+    df.columns = df.columns.str.strip().str.upper()
+
     retroativos = {}
 
-    for _, row in df.iterrows():
-        siape = str(row["SIAPE"]).strip()
-        nome = str(row["NOME"]).strip()
-
+    for i, row in df.iterrows():
         try:
-            dias = int(row["DIA"]) if pd.notna(row["DIA"]) else 0
-        except:
-            dias = 0
+            siape = str(row["SIAPE"]).strip()
+            nome = str(row["NOME"]).strip()
 
-        try:
-            meses = int(row["MÊS"]) if pd.notna(row["MÊS"]) else 0
-        except:
-            meses = 0
+            dia_ini = int(row["DIA_INICIAL"])
+            mes_ini = int(row["MÊS_INICIAL"])
+            ano_ini = int(row["ANO_INICIAL"])
 
-        # Se ambos forem zero, ignora o servidor (opcional)
-        if dias == 0 and meses == 0:
+            dia_fim = int(row["DIA_FINAL"])
+            mes_fim = int(row["MÊS_FINAL"])
+            ano_fim = int(row["ANO_FINAL"])
+
+            # Validação: meses e dias dentro de intervalos válidos
+            if not (1 <= mes_ini <= 12 and 1 <= mes_fim <= 12):
+                print(f" Linha {i+2}: mês inválido ({mes_ini} ou {mes_fim}) — ignorado.")
+                continue
+
+            if not (1 <= dia_ini <= 31 and 1 <= dia_fim <= 31):
+                print(f" Linha {i+2}: dia inválido ({dia_ini} ou {dia_fim}) — ignorado.")
+                continue
+
+            data_ini = date(ano_ini, mes_ini, dia_ini)
+            data_fim = date(ano_fim, mes_fim, dia_fim)
+
+            if data_fim < data_ini:
+                print(f"Linha {i+2}: data final anterior à inicial — ignorado.")
+                continue
+
+            dias_total = (data_fim - data_ini).days
+
+            # Converte em meses e dias (ex: 45 dias → 1 mês e 15 dias)
+            meses = dias_total // 30
+            dias_restantes = dias_total % 30
+
+            retroativos[siape] = (nome, dias_restantes, meses)
+
+        except Exception as e:
+            print(f" Erro na linha {i+2} ({row.to_dict()}): {e}")
             continue
 
-        retroativos[siape] = (nome, dias, meses)
-
+    print(f"Planilha lida com sucesso! {len(retroativos)} registros válidos.")
     return retroativos
+
+
 
 def calcular_retroativos():
     pdf_antigo = entrada_pdf_antigo.get()
@@ -90,8 +118,8 @@ def calcular_retroativos():
         nome_antigo, val_antigo = dict_antigo.get(siape, (nome_plan, 0.0))
         nome_atual, val_atual = dict_atual.get(siape, (nome_plan, 0.0))
 
-        x3 = val_atual - val_antigo
-        retroativo = (x3 * meses) + ((x3 / 30) * dias)
+        salario = val_atual - val_antigo
+        retroativo = (salario * meses) + ((salario / 30) * dias)
 
 
 #--------------------programação da logica etapa  3 DADOS EXTRATOR SIAPE:-----------------------------
@@ -117,7 +145,7 @@ def ler_dados_siape(caminho_planilha):
             print(f"SIAPE: {siape} | DV: {dv} | ORIGEM: {origem} | NOME: {nome}")
         return dados
     except Exception as e:
-        print(f"❌ Erro ao ler planilha de dados SIAPE: {e}")
+        print(f" Erro ao ler planilha de dados SIAPE: {e}")
         return {}
 
 
@@ -239,14 +267,14 @@ def gerar_csv_carga_batch(dados_siape, resultado_diferenca, rubrica, sequencia, 
                 ]
                 escritor.writerow(linha)
 
-        return True, f"✅ CSV gerado com sucesso em: {caminho_saida}"
+        return True, f" CSV gerado com sucesso em: {caminho_saida}"
 
     except Exception as e:
-        return False, f"❌ Erro ao gerar CSV: {e}"
+        return False, f"Erro ao gerar CSV: {e}"
 
 
     except Exception as e:
-        return False, f"❌ Erro ao gerar CSV: {e}"
+        return False, f"Erro ao gerar CSV: {e}"
 
 # - - --------------------------Criar janela principal------------------------
 janela = tk.Tk()
@@ -358,8 +386,8 @@ def gerar_resultado():
     for siape, (nome, dias, meses) in retroativos.items():
         nome_antigo, val_antigo = dict_antigo.get(siape, (nome, 0.0))
         nome_atual, val_atual = dict_atual.get(siape, (nome, 0.0))
-        x3 = val_atual - val_antigo
-        retroativo = (x3 * meses) + ((x3 / 30) * dias)
+        salario = val_atual - val_antigo
+        retroativo = (salario * meses) + ((salario / 30) * dias)
         valor_final = val_atual + retroativo
 
         resultado.append({
@@ -381,7 +409,7 @@ def gerar_resultado():
              messagebox.showerror("Erro", mensagem)
 tk.Button(
     janela,
-    text="💾 Gerar Arquivo de Pagamento (CSV) - 3º Resultado",
+    text="Gerar Arquivo de Pagamento (CSV) - 3º Resultado",
     bg="#4CAF50",  # verde mais forte
     fg="white",
     font=("Arial", 12, "bold"),
@@ -392,7 +420,7 @@ tk.Button(
 
 btn_resultado1 = tk.Button(
     janela,
-    text="📄 1º Resultado - Diferença Bruta",
+    text="1º Resultado - Diferença Bruta",
     bg="#2196F3",  # azul médio
     fg="white",
     font=("Arial", 11, "bold"),
@@ -404,7 +432,7 @@ btn_resultado1.pack(pady=10)
 
 btn_resultado2 = tk.Button(
     janela,
-    text="📄 2º Resultado - Retroativo Proporcional",
+    text="2º Resultado - Retroativo Proporcional",
     bg="#FF9800",  # laranja médio
     fg="white",
     font=("Arial", 11, "bold"),
