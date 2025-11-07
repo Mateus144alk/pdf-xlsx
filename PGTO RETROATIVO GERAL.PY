@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import pandas as pd
 import os
+import calendar
 import csv
 from datetime import date
 # Dados globais
@@ -45,7 +46,6 @@ def extrair_dados_pdf(path_pdf):
     return dados
 #-------------------------------programação e logica etapa 2  DATA RETROATIVA DO PAGAMENTO---------------------===
 def ler_planilha_retroativa(caminho):
-    import pandas as pd
     df = pd.read_excel(caminho)
     df.columns = df.columns.str.strip().str.upper()
 
@@ -59,18 +59,16 @@ def ler_planilha_retroativa(caminho):
             dia_ini = int(row["DIA_INICIAL"])
             mes_ini = int(row["MÊS_INICIAL"])
             ano_ini = int(row["ANO_INICIAL"])
-
             dia_fim = int(row["DIA_FINAL"])
             mes_fim = int(row["MÊS_FINAL"])
             ano_fim = int(row["ANO_FINAL"])
 
-            # Validação: meses e dias dentro de intervalos válidos
+            # Validações básicas
             if not (1 <= mes_ini <= 12 and 1 <= mes_fim <= 12):
-                print(f" Linha {i+2}: mês inválido ({mes_ini} ou {mes_fim}) — ignorado.")
+                print(f"Linha {i+2}: mês inválido ({mes_ini} ou {mes_fim}) — ignorado.")
                 continue
-
             if not (1 <= dia_ini <= 31 and 1 <= dia_fim <= 31):
-                print(f" Linha {i+2}: dia inválido ({dia_ini} ou {dia_fim}) — ignorado.")
+                print(f"Linha {i+2}: dia inválido ({dia_ini} ou {dia_fim}) — ignorado.")
                 continue
 
             data_ini = date(ano_ini, mes_ini, dia_ini)
@@ -80,21 +78,31 @@ def ler_planilha_retroativa(caminho):
                 print(f"Linha {i+2}: data final anterior à inicial — ignorado.")
                 continue
 
-            dias_total = (data_fim - data_ini).days
+            # Calcula diferença básica
+            anos = ano_fim - ano_ini
+            meses = mes_fim - mes_ini + anos * 12
+            dias = dia_fim - dia_ini
 
-            # Converte em meses e dias (ex: 45 dias → 1 mês e 15 dias)
-            meses = dias_total // 30
-            dias_restantes = dias_total % 30
+            # Corrige dias negativos
+            if dias < 0:
+                meses -= 1
+                mes_corrigido = mes_fim - 1 if mes_fim > 1 else 12
+                ano_corrigido = ano_fim if mes_fim > 1 else ano_fim - 1
+                dias_no_mes_anterior = calendar.monthrange(ano_corrigido, mes_corrigido)[1]
+                dias += dias_no_mes_anterior
 
-            retroativos[siape] = (nome, dias_restantes, meses)
+            if (ano_ini, mes_ini) != (ano_fim, mes_fim) and dia_fim >= dia_ini:
+                meses += 1
+                dias = 0  # zera os dias, já contou o mês completo
+
+            retroativos[siape] = (nome, dias, meses)
 
         except Exception as e:
             print(f" Erro na linha {i+2} ({row.to_dict()}): {e}")
             continue
 
-    print(f"Planilha lida com sucesso! {len(retroativos)} registros válidos.")
+    print(f" processada! {len(retroativos)} registros válidos.")
     return retroativos
-
 
 
 def calcular_retroativos():
